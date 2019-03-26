@@ -12,7 +12,7 @@ object SVM {
     a zip b map (x => x._1 * x._2) sum
   }
 
-  def svm(x: Map[Int, Double], y: Int, w: List[Double]): Map[Int, Double] = {
+  def svm(x: Map[Int, Double], y: Int, w: Array[Double]): Map[Int, Double] = {
     val xe = x.values.toList
     val we = select(x, w)
     val g = gradient(xe, y, we)
@@ -28,7 +28,7 @@ object SVM {
     a map (_ * b)
   }
 
-  def select(x: Map[Int, Double], w: List[Double]): List[Double] = {
+  def select(x: Map[Int, Double], w: Array[Double]): List[Double] = {
     x.keys.toList map w
   }
 

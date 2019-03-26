@@ -1,9 +1,10 @@
+package main
 import java.lang.Integer.max
 
 import org.apache.spark.{SparkConf, SparkContext}
 import svm.SVM.svm
 
-class Main {
+object Main {
   def main(args: Array[String]): Unit = {
     val appName = "g1"
     val master = "local"
@@ -11,9 +12,8 @@ class Main {
     val conf = new SparkConf().setAppName(appName).setMaster(master)
     val sc = new SparkContext(conf)
 
-    val datalines = sc.textFile("hdfs://data/datasets/lyrl2004_vectors_train.dat")
-    val topics = sc.textFile("hdfs://data/datasets/rcv1-v2.topics.qrels")
-
+    val datalines = sc.textFile("hdfs:///data/datasets/lyrl2004_vectors_train.dat")
+    val topics = sc.textFile("hdfs:///data/datasets/rcv1-v2.topics.qrels")
 
     val selected = "CCAT"
 
@@ -43,7 +43,7 @@ class Main {
     val batchSize = 128
     val gamma = 0.01
 
-    var weights: List[Double] = List.fill(dimensions)(0.0)
+    var weights = Array.fill(dimensions)(0.0)
 
     for (e <- 0 to epochs) {
       val g = full_data.map(p => {
@@ -57,7 +57,5 @@ class Main {
         weights(a) -= gamma * b
       }
     }
-
-
   }
 }

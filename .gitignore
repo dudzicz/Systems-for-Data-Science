@@ -16,3 +16,8 @@ project/plugins/project/
 .scala_dependencies
 .worksheet
 .idea
+
+*.jar
+
+*META-INF/
+*.DS_Store
