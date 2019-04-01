@@ -3,12 +3,14 @@ package svm
 import java.lang.Double.max
 
 object SVM {
-  def loss(x: List[Double], y: Int, w: List[Double]): Double = {
-    val a = 1 - y * scalar_product(w, x)
+  def loss(x: Map[Int, Double], y: Int, w: Array[Double]): Double = {
+    val xe = x.values.toList
+    val we = select(x, w)
+    val a = 1 - y * scalar_product(we, xe)
     max(a, 0)
   }
 
-  def scalar_product(a: List[Double], b: List[Double]): Double = {
+  def scalar_product(a: Iterable[Double], b: List[Double]): Double = {
     a zip b map (x => x._1 * x._2) sum
   }
 

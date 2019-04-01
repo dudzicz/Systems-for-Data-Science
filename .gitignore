@@ -19,5 +19,5 @@ project/plugins/project/
 
 *.jar
 
-*META-INF/
+*/META-INF/
 *.DS_Store
