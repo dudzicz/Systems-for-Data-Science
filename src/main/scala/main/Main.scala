@@ -40,34 +40,48 @@ object Main {
 
     val full_data = data.join(labels)
     val dimensions: Int = data.map(x => x._2.keys.max).reduce(max) + 1
-    val size = full_data.count()
 
     val epochs = 10
-    val batchSize = 128.0
-    val gamma = 0.03
+    val batchSize = sc.broadcast(128)
+    val gamma = sc.broadcast(0.03)
     print("DIM: " + dimensions)
 
     var weights = Array.fill(dimensions)(0.0)
 
     for (e <- 0 to epochs) {
-      for (b <- 0 to (size / batchSize).toInt) {
-        val batch = full_data.sample(withReplacement = false, batchSize / size)
-        val g = batch.map(p => {
-          val x = p._2._1
-          val y = p._2._2
-          svm(x, y, weights).toSeq
-        }).reduce((p, q) => {
-          p ++ q
-        }).groupBy(_._1).mapValues(p => p.map(_._2).sum).mapValues(x => x / batchSize)
-        for ((a, b) <- g) {
-          weights(a) -= gamma * b
-        }
-        val loss = batch.map(p => SVM.loss(p._2._1, p._2._2, weights)).mean()
-        print("EPOCH: " +  e + " BATCH: " + b + ": " + loss)
-      }
-    }
-    print(weights)
+      val batch_weight = sc.broadcast(weights)
 
+      weights = full_data.mapPartitions(p => {
+        val batches = p.grouped(batchSize.value)
+
+        var w = batch_weight.value
+        for (b <- batches) {
+          val grad = b.map(i => {
+            val x = i._2._1
+            val y = i._2._2
+            svm(x, y, batch_weight.value)
+          }).reduce(mergeMap).mapValues(i => i / batchSize.value)
+          w = update_weight(w, grad, gamma.value)
+        }
+        Iterator.single(w)
+      }).reduce(SVM.add).map(i => i / full_data.partitions.length)
+
+      val loss = full_data.map(p => SVM.loss(p._2._1, p._2._2, weights)).mean()
+      print("EPOCH: " + e + ": " + loss)
+    }
+
+    print(weights)
+  }
+
+  def mergeMap(a: Map[Int, Double], b: Map[Int, Double]): Map[Int, Double] = {
+    (a.toSeq ++ b.toSeq).groupBy(_._1).mapValues(p => p.map(_._2).sum)
+  }
+
+  def update_weight(w: Array[Double], grad: Map[Int, Double], gamma: Double): Array[Double] = {
+    for ((a, b) <- grad) {
+      w(a) -= gamma * b
+    }
+    w
   }
 
 }

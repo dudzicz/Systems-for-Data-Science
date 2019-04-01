@@ -37,4 +37,8 @@ object SVM {
   def add(a: List[Double], b: List[Double]): List[Double] = {
     a zip b map (x => x._1 + x._2)
   }
+
+  def add(a: Array[Double], b: Array[Double]): Array[Double] = {
+    a zip b map (x => x._1 + x._2)
+  }
 }
