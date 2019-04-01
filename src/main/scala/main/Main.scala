@@ -4,7 +4,10 @@ import java.lang.Integer.max
 
 import _root_.svm.SVM
 import org.apache.spark.{SparkConf, SparkContext}
-import svm.SVM.svm
+import svm.SVM.{loss, svm}
+
+import scala.collection.JavaConversions.mapAsJavaMap
+import scala.util.Random
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -19,8 +22,8 @@ object Main {
 
     val selected = "CCAT"
 
-    val labels = topics.map(i => {
-      val p = i.split(" ")
+    val labels = topics.map(line => {
+      val p = line.split(" ")
       p(1).toInt -> p(0)
     }).groupByKey().mapValues(i => {
       if (i.toList.contains(selected)) 1 else -1
@@ -43,38 +46,34 @@ object Main {
 
     val epochs = 10
     val batchSize = sc.broadcast(128)
-    val gamma = sc.broadcast(0.03)
+    val gamma = 0.03
     print("DIM: " + dimensions)
 
     var weights = Array.fill(dimensions)(0.0)
 
     for (e <- 0 to epochs) {
       val batch_weight = sc.broadcast(weights)
+      print("EPOCH: " + e + " START")
+      val g = full_data.mapPartitions(p => {
+        val batch = Random.shuffle(p).take(batchSize.value)
+        val w = batch_weight.value
+        val grad = batch.map(i => {
+          val (_, (x, y)) = i
+          svm(x, y, w)
+        })
+        grad
+      }).reduce(mergeMap).mapValues(i => i / (full_data.getNumPartitions * batchSize.value))
 
-      weights = full_data.mapPartitions(p => {
-        val batches = p.grouped(batchSize.value)
-
-        var w = batch_weight.value
-        for (b <- batches) {
-          val grad = b.map(i => {
-            val x = i._2._1
-            val y = i._2._2
-            svm(x, y, batch_weight.value)
-          }).reduce(mergeMap).mapValues(i => i / batchSize.value)
-          w = update_weight(w, grad, gamma.value)
-        }
-        Iterator.single(w)
-      }).reduce(SVM.add).map(i => i / full_data.partitions.length)
-
-      val loss = full_data.map(p => SVM.loss(p._2._1, p._2._2, weights)).mean()
-      print("EPOCH: " + e + ": " + loss)
+      weights = update_weight(weights, g, gamma)
+      print("EPOCH: " + e + " LOSS")
+      val l = full_data.map(p => loss(p._2._1, p._2._2, weights)).mean()
+      print("EPOCH: " + e + ": " + l)
     }
-
-    print(weights)
   }
 
   def mergeMap(a: Map[Int, Double], b: Map[Int, Double]): Map[Int, Double] = {
-    (a.toSeq ++ b.toSeq).groupBy(_._1).mapValues(p => p.map(_._2).sum)
+    (a.toSeq ++ b.toSeq).groupBy(_._1).mapValues(p => p.map(_._2).sum).map(identity)
+    a.merge
   }
 
   def update_weight(w: Array[Double], grad: Map[Int, Double], gamma: Double): Array[Double] = {
