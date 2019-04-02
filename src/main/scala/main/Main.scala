@@ -9,6 +9,7 @@ import scala.util.Random
 
 object Main {
   def main(args: Array[String]): Unit = {
+
     val appName = "g1"
     val master = "local"
 
@@ -51,9 +52,10 @@ object Main {
 
     var weights = Array.fill(dimensions)(0.0)
 
+    var timesLog :Array[Long] = new Array[Long](4)
     for (e <- 0 to epochs) {
       val batch_weight = sc.broadcast(weights)
-      print("EPOCH: " + e + " START ")
+      timesLog(0) = System.nanoTime()
       val grads = full_data.mapPartitions(p => {
         val batch = p.take(batchSize.value)
         val w = batch_weight.value
@@ -63,14 +65,19 @@ object Main {
         })
         grad
       }).collect()
-      print("EPOCH: " + e + " END ")
-      val g = mergeMaps(grads)
-      //.reduce(mergeMap).mapValues(i => i / (full_data.getNumPartitions * batchSize.value))
-      print("EPOCH: " + e + " MERGE ")
+      val gradsAug = grads.map(x => x.map {case (k,v) => k -> (v,1)} )
+
+      timesLog(1) = System.nanoTime()
+
+      val unNormalG = gradsAug.par.aggregate(Map[Int,(Double,Int)]())(merge,merge)
+      val g = unNormalG.map { case (k, v) => k -> v._1/v._2 }
+      timesLog(2) = System.nanoTime()
       weights = update_weight(weights, g, gamma)
-      print("EPOCH: " + e + " LOSS ")
+      timesLog(3) = System.nanoTime()
       val l = full_data.map(p => loss(p._2._1, p._2._2, weights)).mean()
-      print("EPOCH: " + e + ": " + l + " ")
+      print("EPOCH " + e)
+      for (elem <- timesLog) {print(" ; " + elem/1000000000.0 + " ; ")}
+      print(l)
     }
   }
 
@@ -85,15 +92,8 @@ object Main {
     w
   }
 
-  def mergeMaps(a: Array[Map[Int, Double]]): Map[Int, Double] = {
-    var p: Seq[(Int, Double)] = Seq.empty
-    for (i <- a) {
-      p = p ++ i.toSeq
-    }
-    p.groupBy(_._1).mapValues(p => {
-      val m = p.map(_._2)
-      m.sum / m.size
-    }).map(identity)
+  def merge(m1: Map[Int, (Double,Int)], m2: Map[Int, (Double, Int)]) : Map[Int, (Double,Int)] = {
+    m2 ++ m1.map { case (k, v) => k -> (v._1 + m2.getOrElse(k, (0.0,0))._1, v._2 + m2.getOrElse(k, (0.0,0))._2)}
   }
 
 }
