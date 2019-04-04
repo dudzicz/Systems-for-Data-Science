@@ -5,6 +5,7 @@ import java.lang.Integer.max
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext, rdd}
 import scala.util.control.Breaks._
 import svm.SVM.{loss, svm}
+import scala.util.Random
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -44,7 +45,7 @@ object Main {
 
     // split data into train set and test set
     val full_data = data.join(labels)
-    val train_proportion = 0.8
+    val train_proportion = 0.9
     val seed = 42
 
     full_data.cache()
@@ -55,7 +56,7 @@ object Main {
     val train_part = train_set.partitionBy(new HashPartitioner(workers))
     val test_part = test_set.partitionBy(new HashPartitioner(workers))
 
-    val epochs = 10
+    val epochs = 10000
     val batchSize = sc.broadcast(128)
     val gamma = 0.03
     print("DIM: " + dimensions + ", " + full_data.getNumPartitions + "\n")
@@ -74,12 +75,14 @@ object Main {
         val batch_weight = sc.broadcast(weights)
         timesLog(0) = System.nanoTime()
         val grads = train_part.mapPartitions(p => {
-          val batch = p.take(batchSize.value)
+          val shuffledP = Random.shuffle(p)
+          val batch = shuffledP.take(batchSize.value)
           val w = batch_weight.value
           val grad = batch.map(i => {
             val (_, (x, y)) = i
             svm(x, y, w)
           })
+          print("GRAD VALUE :" + grad.toString())
           grad
         }).collect()
         val gradsAug = grads.map(x => x.map { case (k, v) => k -> (v, 1) })
