@@ -2,10 +2,9 @@ package main
 
 import java.lang.Integer.max
 
-import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
+import org.apache.spark.{HashPartitioner, SparkConf, SparkContext, rdd}
+import scala.util.control.Breaks._
 import svm.SVM.{loss, svm}
-
-import scala.util.Random
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -41,9 +40,20 @@ object Main {
       }).toMap
       (l, x)
     })
-
-    val full_data = data.join(labels).partitionBy(new HashPartitioner(workers))
     val dimensions: Int = data.map(x => x._2.keys.max).reduce(max) + 1
+
+    // split data into train set and test set
+    val full_data = data.join(labels)
+    val train_proportion = 0.8
+    val seed = 42
+
+    full_data.cache()
+    val split = full_data.randomSplit(Array(train_proportion, 1 - train_proportion), seed)
+    val train_set = split(0)
+    val test_set = split(1)
+
+    val train_part = train_set.partitionBy(new HashPartitioner(workers))
+    val test_part = test_set.partitionBy(new HashPartitioner(workers))
 
     val epochs = 10
     val batchSize = sc.broadcast(128)
@@ -52,37 +62,57 @@ object Main {
 
     var weights = Array.fill(dimensions)(0.0)
 
-    var timesLog :Array[Long] = new Array[Long](4)
-    for (e <- 0 to epochs) {
-      val batch_weight = sc.broadcast(weights)
-      timesLog(0) = System.nanoTime()
-      val grads = full_data.mapPartitions(p => {
-        val batch = p.take(batchSize.value)
-        val w = batch_weight.value
-        val grad = batch.map(i => {
-          val (_, (x, y)) = i
-          svm(x, y, w)
-        })
-        grad
-      }).collect()
-      val gradsAug = grads.map(x => x.map {case (k,v) => k -> (v,1)} )
+    val timesLog: Array[Long] = new Array[Long](4)
 
-      timesLog(1) = System.nanoTime()
+    //early stopping vars
+    val patience = 1
+    var previous_loss : Double = 1.1
+    var patience_counter: Int = 0
 
-      val unNormalG = gradsAug.par.aggregate(Map[Int,(Double,Int)]())(merge,merge)
-      val g = unNormalG.map { case (k, v) => k -> v._1/v._2 }
-      timesLog(2) = System.nanoTime()
-      weights = update_weight(weights, g, gamma)
-      timesLog(3) = System.nanoTime()
-      val l = full_data.map(p => loss(p._2._1, p._2._2, weights)).mean()
-      print("EPOCH " + e)
-      for (elem <- timesLog) {print(" ; " + elem/1000000000.0 + " ; ")}
-      print(l)
+    breakable {
+      for (e <- 0 to epochs) {
+        val batch_weight = sc.broadcast(weights)
+        timesLog(0) = System.nanoTime()
+        val grads = train_part.mapPartitions(p => {
+          val batch = p.take(batchSize.value)
+          val w = batch_weight.value
+          val grad = batch.map(i => {
+            val (_, (x, y)) = i
+            svm(x, y, w)
+          })
+          grad
+        }).collect()
+        val gradsAug = grads.map(x => x.map { case (k, v) => k -> (v, 1) })
+
+        timesLog(1) = System.nanoTime()
+
+        val unNormalG = gradsAug.par.aggregate(Map[Int, (Double, Int)]())(merge, merge)
+        val g = unNormalG.map { case (k, v) => k -> v._1 / v._2 }
+        timesLog(2) = System.nanoTime()
+        weights = update_weight(weights, g, gamma)
+        timesLog(3) = System.nanoTime()
+        val l = train_part.map(p => loss(p._2._1, p._2._2, weights)).mean()
+        val val_loss = test_part.map(p => loss(p._2._1, p._2._2, weights)).mean()
+        print("EPOCH " + e)
+        for (elem <- timesLog) {
+          print(" ; " + elem / 1000000000.0 + " ; ")
+        }
+        print("train loss :" + l)
+        print("test loss: " + val_loss)
+
+        //early stopping
+        if(val_loss > previous_loss && patience_counter == patience){
+            break
+        }else{
+          if(val_loss > previous_loss){
+            patience_counter = patience_counter + 1
+          }else{
+            patience_counter = 1
+          }
+          previous_loss = val_loss
+        }
+      }
     }
-  }
-
-  def mergeMap(a: Map[Int, Double], b: Map[Int, Double]): Map[Int, Double] = {
-    (a.toSeq ++ b.toSeq).groupBy(_._1).mapValues(p => p.map(_._2).sum).map(identity)
   }
 
   def update_weight(w: Array[Double], grad: Map[Int, Double], gamma: Double): Array[Double] = {
