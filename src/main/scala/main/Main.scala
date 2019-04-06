@@ -1,6 +1,6 @@
 package main
 
-import java.io.{File, FileWriter}
+import java.io.FileWriter
 
 import main.Data.load_data
 import main.Parameters._
@@ -26,7 +26,7 @@ object Main {
 
     val workers = conf.getInt("spark.executor.instances", 1)
     val fileName = "/data/log/" + workers + "_" + BATCH_SIZE
-    val logfile = new FileWriter(fileName, true)
+    val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers)
     val (data, dimensions) = load_data(sc, DATA_PATH)
 
