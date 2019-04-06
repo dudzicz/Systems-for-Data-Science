@@ -1,16 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-if [[ $# -lt 1 ]]
+if [[ $# -lt 2 ]]
 then
-    echo "Usage ${0} <workers>"
+    echo "Usage ${0} <workers> <batch_size>"
     exit
 fi
 
 WORKERS=${1}
+BATCH_SIZE=${2}
 kubectl delete pods svm
-echo "Copying SVM.jar..."
-kubectl cp SVM.jar cs449g1/data-pod:/data/app/SVM.jar
-
-echo "Running distributed SGD with $WORKERS workers"
-$SPARK_HOME/bin/spark-submit --class main.Main --properties-file Spark/spark_conf --conf spark.executor.instances=${WORKERS} local:///data/app/SVM.jar
-sh get_logs.sh svm logs/logs${WORKERS}
+sleep 10
+echo "Running distributed SGD with $WORKERS workers and $BATCH_SIZE batch size"
+${SPARK_HOME}/bin/spark-submit --class main.Main --properties-file Spark/spark_conf --conf spark.executor.instances=${WORKERS} local:///data/app/SVM.jar ${BATCH_SIZE}
+kubectl cp cs449g1/data-pod:/data/log/${WORKERS}_${BATCH_SIZE} logs/${WORKERS}_${BATCH_SIZE}

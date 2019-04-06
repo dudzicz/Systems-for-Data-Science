@@ -19,7 +19,7 @@ project/plugins/project/
 
 *.jar
 
-*/META-INF/
+*MANIFEST.MF
 *.DS_Store
 *.ipynb_checkpoints/
 project/

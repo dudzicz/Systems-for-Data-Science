@@ -1,5 +1,7 @@
 package main
 
+import java.io.{File, FileWriter}
+
 import main.Data.load_data
 import main.Parameters._
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
@@ -9,12 +11,23 @@ import scala.util.Random
 import scala.util.control.Breaks._
 
 object Main {
+
+
   def main(args: Array[String]): Unit = {
+    if (args.length > 1) {
+      throw new IllegalArgumentException()
+    } else if (args.length == 1) {
+      BATCH_SIZE = args(0).toInt
+    }
+
+
     val conf = new SparkConf()
     val sc = new SparkContext(conf)
 
     val workers = conf.getInt("spark.executor.instances", 1)
-    logParams(workers)
+    val fileName = "/data/log/" + workers + "_" + BATCH_SIZE
+    val logfile = new FileWriter(fileName, true)
+    logParams(logfile, workers)
     val (data, dimensions) = load_data(sc, DATA_PATH)
 
     data.cache()
@@ -33,7 +46,7 @@ object Main {
 
     breakable {
       for (e <- 0 to EPOCHS) {
-        log(e, "START")
+        log(logfile, e, "START")
         val batch_weight = sc.broadcast(weights)
         val grads = train_part.mapPartitions(p => {
           val batch = Random.shuffle(p).take(batchSize.value)
@@ -46,21 +59,21 @@ object Main {
         }).collect()
         val gradsAug = grads.map(x => x.map { case (k, v) => k -> (v, 1) })
 
-        log(e, "GRADIENTS_COMPUTED")
+        log(logfile, e, "GRADIENTS_COMPUTED")
 
         val unNormalG = gradsAug.par.aggregate(Map[Int, (Double, Int)]())(merge, merge)
         val g = unNormalG.map { case (k, v) => k -> v._1 / v._2 }
 
-        log(e, "GRADIENTS_MERGED")
+        log(logfile, e, "GRADIENTS_MERGED")
 
         weights = update_weight(weights, g, LEARNING_RATE)
 
-        log(e, "WEIGHTS_UPDATED")
+        log(logfile, e, "WEIGHTS_UPDATED")
 
         val train_loss = train_part.map(p => loss(p._2._1, p._2._2, weights, LAMBDA)).mean()
         val val_loss = test_part.map(p => loss(p._2._1, p._2._2, weights, LAMBDA)).mean()
 
-        log(e, "SUMMARY(tl=" + train_loss + ",vl=" + val_loss + ")")
+        log(logfile, e, "SUMMARY(tl=" + train_loss + ",vl=" + val_loss + ")")
 
         //early stopping
         if (val_loss > best_loss && patience_counter == PATIENCE) {
@@ -76,18 +89,22 @@ object Main {
         }
       }
     }
+    logfile.flush()
   }
 
-  def log(epoch: Int, message: String): Unit = {
-    print("SVM EPOCH(" + epoch + ") " + message + " " + System.nanoTime() + "\n")
+  def log(logfile: FileWriter, epoch: Int, message: String): Unit = {
+    logfile.append("SVM EPOCH(" + epoch + ") " + message + " " + System.nanoTime() + "\n")
+
   }
 
-  def logParams(workers: Int): Unit = {
-    print("SVM PARAMETERS " + "WORKERS=" + workers + ",EPOCHS=" + EPOCHS + ",BATCH_SIZE=" + BATCH_SIZE + ",LEARNING_RATE=" + LEARNING_RATE + ",PATIENCE=" + PATIENCE + "\n")
+  def logParams(logfile: FileWriter, workers: Int): Unit = {
+    logfile.append("SVM PARAMETERS " + "WORKERS=" + workers + ",EPOCHS=" + EPOCHS + ",BATCH_SIZE=" + BATCH_SIZE + ",LEARNING_RATE=" + LEARNING_RATE + ",PATIENCE=" + PATIENCE + "\n")
   }
 
   def merge(m1: Map[Int, (Double, Int)], m2: Map[Int, (Double, Int)]): Map[Int, (Double, Int)] = {
-    m2 ++ m1.map { case (k, v) => k -> (v._1 + m2.getOrElse(k, (0.0, 0))._1, v._2 + m2.getOrElse(k, (0.0, 0))._2) }
+    m2 ++ m1.map {
+      case (k, v) => k -> (v._1 + m2.getOrElse(k, (0.0, 0))._1, v._2 + m2.getOrElse(k, (0.0, 0))._2)
+    }
   }
 
 }
