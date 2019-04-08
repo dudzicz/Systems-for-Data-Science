@@ -1,6 +1,8 @@
-package svm
+package main
 
 import java.lang.Double.max
+
+import org.apache.spark.rdd.RDD
 
 object SVM {
   def loss(x: Map[Int, Double], y: Int, w: Array[Double], lambda: Double): Double = {
@@ -47,5 +49,30 @@ object SVM {
       w(a) -= gamma * b
     }
     w
+  }
+
+  def predict(x: Map[Int, Double], w: Array[Double]): Int = {
+    val xe = x.values.toList
+    val we = select(x, w)
+    if (scalar_product(xe, we) >= 0) 1 else -1
+  }
+
+  def accuracy(data: RDD[(Int, (Map[Int, Double], Int))], weights: Array[Double]): (Double, Double, Double) ={
+    val preds = data.map(p => {
+      val (x, y) = p._2
+      val pred = predict(x, weights)
+      (y, pred == y)
+    })
+    preds.cache()
+    val acc = preds.map(p => {
+      if (p._2) 1 else 0
+    }).mean()
+    val pos_acc = preds.filter(p => p._1 == 1).map(p => {
+      if (p._2) 1 else 0
+    }).mean()
+    val neg_acc = preds.filter(p => p._1 == -1).map(p => {
+      if (p._2) 1 else 0
+    }).mean()
+    (acc, pos_acc, neg_acc)
   }
 }

@@ -13,7 +13,8 @@ err=$?
 if [[ ${err} -eq 0 ]]
 then
     kubectl delete pods svm
-	until kubectl get pod svm 2>&1 >/dev/null
+    kubectl get pod svm 2>&1 > /dev/null
+	while kubectl get pod svm 2>&1 > /dev/null
 	do
 	    sleep 1
 	done

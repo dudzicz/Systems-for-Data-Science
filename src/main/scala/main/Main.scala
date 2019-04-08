@@ -2,10 +2,10 @@ package main
 
 import java.io.FileWriter
 
-import main.Data.load_data
+import main.Data.{load_test, load_train}
 import main.Parameters._
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
-import svm.SVM.{loss, svm, update_weight}
+import SVM.{accuracy, loss, svm, update_weight}
 
 import scala.util.Random
 import scala.util.control.Breaks._
@@ -28,15 +28,14 @@ object Main {
     val fileName = "/data/log/" + workers + "_" + BATCH_SIZE
     val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers)
-    val (data, dimensions) = load_data(sc, DATA_PATH)
+    val (data, dimensions) = load_train(sc, DATA_PATH)
 
     data.cache()
     val split = data.randomSplit(Array(1 - VALIDATION_RATIO, VALIDATION_RATIO), SEED)
     val train_set = split(0).partitionBy(new HashPartitioner(workers))
-    val test_set = split(1).partitionBy(new HashPartitioner(workers))
+    val validation_set = split(1).partitionBy(new HashPartitioner(workers))
 
-    val train_part = train_set
-    val test_part = test_set
+    load_train(sc, DATA_PATH)
 
     val batchSize = sc.broadcast(BATCH_SIZE)
     var weights = Array.fill(dimensions)(0.0)
@@ -48,7 +47,7 @@ object Main {
       for (e <- 0 to EPOCHS) {
         log(logfile, e, "START")
         val batch_weight = sc.broadcast(weights)
-        val grads = train_part.mapPartitions(p => {
+        val grads = train_set.mapPartitions(p => {
           val batch = Random.shuffle(p).take(batchSize.value)
           val w = batch_weight.value
           val grad = batch.map(i => {
@@ -70,8 +69,8 @@ object Main {
 
         log(logfile, e, "WEIGHTS_UPDATED")
 
-        val train_loss = train_part.map(p => loss(p._2._1, p._2._2, weights, LAMBDA)).mean()
-        val val_loss = test_part.map(p => loss(p._2._1, p._2._2, weights, LAMBDA)).mean()
+        val train_loss = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA)).mean()
+        val val_loss = validation_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA)).mean()
 
         log(logfile, e, "SUMMARY(tl=" + train_loss + ",vl=" + val_loss + ")")
 
@@ -85,11 +84,18 @@ object Main {
             patience_counter = 1
             best_loss = val_loss
           }
-
         }
       }
     }
+    val test = load_test(sc, DATA_PATH)
+    val (acc, pos_acc, neg_acc) = accuracy(test, weights)
+    log(logfile, "ACCURACY(acc=" + acc + ",+acc=" + pos_acc + ",-acc=" + neg_acc)
     logfile.flush()
+  }
+
+  def log(logfile: FileWriter, message: String): Unit = {
+    logfile.append("SVM " + message + " " + System.nanoTime() + "\n")
+
   }
 
   def log(logfile: FileWriter, epoch: Int, message: String): Unit = {
