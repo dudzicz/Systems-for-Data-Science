@@ -95,7 +95,6 @@ object Main {
 
   def log(logfile: FileWriter, message: String): Unit = {
     logfile.append("SVM " + message + " " + System.nanoTime() + "\n")
-
   }
 
   def log(logfile: FileWriter, epoch: Int, message: String): Unit = {

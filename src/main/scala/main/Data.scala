@@ -40,7 +40,7 @@ object Data {
     val l = 0 until 4
     val topics = sc.textFile(path + "rcv1-v2.topics.qrels")
     val rdds  = l.map(i => {
-      val datalines = sc.textFile(path + " lyrl2004_vectors_test_pt" + i + ".dat")
+      val datalines = sc.textFile(path + "lyrl2004_vectors_test_pt" + i + ".dat")
       val selected = Parameters.SELECT_LABEL
       val labels = topics.map(line => {
         val split = line.split(" ")
