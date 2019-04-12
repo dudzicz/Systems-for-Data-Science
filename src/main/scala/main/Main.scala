@@ -2,10 +2,10 @@ package main
 
 import java.io.FileWriter
 
-import main.Data.{load_test, load_train}
+import main.Data.{load_train, test_accuracy}
 import main.Parameters._
+import main.SVM.{loss, svm, update_weight}
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
-import SVM.{accuracy, loss, svm, update_weight}
 
 import scala.util.Random
 import scala.util.control.Breaks._
@@ -87,9 +87,8 @@ object Main {
         }
       }
     }
-    val test = load_test(sc, DATA_PATH)
-    val (acc, pos_acc, neg_acc) = accuracy(test, weights)
-    log(logfile, "ACCURACY(acc=" + acc + ",+acc=" + pos_acc + ",-acc=" + neg_acc)
+    val (acc, pos_acc, neg_acc) = test_accuracy(sc, DATA_PATH, weights)
+    log(logfile, "ACCURACY(acc=" + acc + ",+acc=" + pos_acc + ",-acc=" + neg_acc + ")")
     logfile.flush()
   }
 
@@ -99,7 +98,6 @@ object Main {
 
   def log(logfile: FileWriter, epoch: Int, message: String): Unit = {
     logfile.append("SVM EPOCH(" + epoch + ") " + message + " " + System.nanoTime() + "\n")
-
   }
 
   def logParams(logfile: FileWriter, workers: Int): Unit = {

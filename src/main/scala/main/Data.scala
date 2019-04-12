@@ -36,10 +36,10 @@ object Data {
     (data.join(labels), data.map(x => x._2.keys.max).reduce(max) + 1)
   }
 
-  def load_test(sc: SparkContext, path: String): RDD[(Int, (Map[Int, Double], Int))] = {
+  def test_accuracy(sc: SparkContext, path: String, weights: Array[Double]): (Double, Double, Double) = {
     val l = 0 until 4
     val topics = sc.textFile(path + "rcv1-v2.topics.qrels")
-    val rdds  = l.map(i => {
+    val rdds = l.map(i => {
       val datalines = sc.textFile(path + "lyrl2004_vectors_test_pt" + i + ".dat")
       val selected = Parameters.SELECT_LABEL
       val labels = topics.map(line => {
@@ -62,7 +62,7 @@ object Data {
       })
       data.join(labels)
     })
-    val data = rdds.reduce(_ ++ _)
-    data
+    val (tp, tn, pos, neg) = rdds.map(SVM.accuracy(_, weights)).reduce((x, y) => (x._1 + y._1, x._2 + y._2, x._3 + y._3, x._4 + y._4))
+    ((tp + tn).toDouble / (pos + neg), tp.toDouble / pos, tn.toDouble / neg)
   }
 }

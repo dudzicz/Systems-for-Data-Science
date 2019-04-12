@@ -12,10 +12,6 @@ object SVM {
     max(a, 0) + lambda * we.map(i => i * i).sum
   }
 
-  def scalar_product(a: Iterable[Double], b: List[Double]): Double = {
-    a zip b map (x => x._1 * x._2) sum
-  }
-
   def svm(x: Map[Int, Double], y: Int, w: Array[Double], lambda: Double): Map[Int, Double] = {
     val xe = x.values.toList
     val we = select(x, w)
@@ -28,16 +24,20 @@ object SVM {
     add(scalar_mult(w, 2 * lambda), if (a >= 1) x map (_ => 0.0) else scalar_mult(x, -y))
   }
 
+  def scalar_product(a: Iterable[Double], b: List[Double]): Double = {
+    a zip b map (x => x._1 * x._2) sum
+  }
+
   def scalar_mult(a: List[Double], b: Double): List[Double] = {
     a map (_ * b)
   }
 
-  def select(x: Map[Int, Double], w: Array[Double]): List[Double] = {
-    x.keys.toList map w
-  }
-
   def add(a: List[Double], b: List[Double]): List[Double] = {
     a zip b map (x => x._1 + x._2)
+  }
+
+  def select(x: Map[Int, Double], w: Array[Double]): List[Double] = {
+    x.keys.toList map w
   }
 
   def add(a: Array[Double], b: Array[Double]): Array[Double] = {
@@ -51,28 +51,33 @@ object SVM {
     w
   }
 
-  def predict(x: Map[Int, Double], w: Array[Double]): Int = {
-    val xe = x.values.toList
-    val we = select(x, w)
-    if (scalar_product(xe, we) >= 0) 1 else -1
-  }
-
-  def accuracy(data: RDD[(Int, (Map[Int, Double], Int))], weights: Array[Double]): (Double, Double, Double) ={
+  def accuracy(data: RDD[(Int, (Map[Int, Double], Int))], weights: Array[Double]): (Long, Long, Long, Long) = {
     val preds = data.map(p => {
       val (x, y) = p._2
       val pred = predict(x, weights)
       (y, pred == y)
     })
     preds.cache()
-    val acc = preds.map(p => {
-      if (p._2) 1 else 0
-    }).mean()
-    val pos_acc = preds.filter(p => p._1 == 1).map(p => {
-      if (p._2) 1 else 0
-    }).mean()
-    val neg_acc = preds.filter(p => p._1 == -1).map(p => {
-      if (p._2) 1 else 0
-    }).mean()
-    (acc, pos_acc, neg_acc)
+    val pos = preds.filter(p => p._1 == 1)
+    pos.cache()
+
+    val neg = preds.filter(p => p._1 == -1)
+    neg.cache()
+
+    val true_pos = pos.filter(p => {
+      p._2
+    }).count()
+
+    val true_neg = neg.filter(p => {
+      p._2
+    }).count()
+
+    (true_pos, true_neg, pos.count(), neg.count())
+  }
+
+  def predict(x: Map[Int, Double], w: Array[Double]): Int = {
+    val xe = x.values.toList
+    val we = select(x, w)
+    if (scalar_product(xe, we) >= 0) 1 else -1
   }
 }

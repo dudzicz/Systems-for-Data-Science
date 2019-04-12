@@ -3,7 +3,6 @@ spark.submit.deployMode                                                         
 spark.app.name                                                                      distributed_sgd
 spark.kubernetes.namespace                                                          cs449g1
 spark.kubernetes.authenticate.driver.serviceAccountName                             spark
-spark.kubernetes.driver.pod.name                                                    svm
 spark.kubernetes.driver.volumes.persistentVolumeClaim.myvolume.options.claimName    cs449g1-scratch
 spark.kubernetes.executor.volumes.persistentVolumeClaim.myvolume.options.claimName  cs449g1-scratch
 spark.kubernetes.driver.volumes.persistentVolumeClaim.myvolume.mount.path           /data
