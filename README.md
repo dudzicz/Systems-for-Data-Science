@@ -24,4 +24,24 @@ It is also required to define the environment variable ```$SPARK_HOME``` to the 
 * ```Parameters.Scala``` holds constants and parameters
 * ```SVM.scala``` contains the machine learning computations functions for the SVM
 
-### How to Run the Code
+### How to Run the Project
+
+In order to create the pod used to upload data to the cluster use the following command:
+
+```
+kubectl create -f Kubernetes/data_pod.yaml
+```
+
+In order to run the program on the cluster, use the following commands:
+
+```
+make workers=<workers> batch_size=<batch_size>
+```
+
+with `<workers>` and `<batch_size>` being the desired number of workers and batch size respectively.
+
+In order to run the program with the same inputs we used for the report, use the following command:
+
+```
+sh run_all.sh
+```
