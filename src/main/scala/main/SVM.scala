@@ -51,6 +51,13 @@ object SVM {
     w
   }
 
+  //Optimize helper function to merge gradients in a faster manner
+  def merge(m1: Map[Int, (Double, Int)], m2: Map[Int, (Double, Int)]): Map[Int, (Double, Int)] = {
+    m2 ++ m1.map {
+      case (k, v) => k -> (v._1 + m2.getOrElse(k, (0.0, 0))._1, v._2 + m2.getOrElse(k, (0.0, 0))._2)
+    }
+  }
+
   def accuracy(data: RDD[(Int, (Map[Int, Double], Int))], weights: Array[Double]): (Long, Long, Long, Long) = {
     val preds = data.map(p => {
       val (x, y) = p._2
