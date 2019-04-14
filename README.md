@@ -14,7 +14,7 @@ In order to compile and run the program the following should be installed on the
 3. Spark version 2.4.0
 4. SBT version 1.2.8
 
-It is also required to define the environment variable ```$SPARK_HOME``` to the absolute path of spark in the
+It is also required to define the environment variable ```$SPARK_HOME``` to be the absolute path of spark folder on the local machine.
 
 ### Source Code Structure
 
