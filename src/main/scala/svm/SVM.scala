@@ -1,4 +1,4 @@
-package main
+package svm
 
 import java.lang.Double.max
 

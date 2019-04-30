@@ -20,7 +20,7 @@ It is also required to define the environment variable ```$SPARK_HOME``` to the 
 
 ```src/main/scala``` contains the source code of the implementaiton
 * ```Data.scala``` contains the method to load and parse the Data
-* ```Main.scala``` contains the core of the run and the computations
+* ```main.Main.scala``` contains the core of the run and the computations
 * ```Parameters.Scala``` holds constants and parameters
 * ```SVM.scala``` contains the machine learning computations functions for the SVM
 

@@ -1,16 +1,18 @@
-package main
+package distributed
 
 import java.lang.Integer.max
 
+import main.Parameters
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import svm.SVM.accuracy
 
 object Data {
 
-  //Main function to load properly the data and structure it in a fashion which can be handled easily
+  //main.Main function to load properly the data and structure it in a fashion which can be handled easily
   def load_data(sc: SparkContext, path: String): (RDD[(Int, (Map[Int, Double], Int))], Int) = {
-    val datalines = sc.textFile(path + "lyrl2004_vectors_train.dat")
-    val topics = sc.textFile(path + "rcv1-v2.topics.qrels")
+    val datalines = sc.textFile("file://" + path + "lyrl2004_vectors_train.dat")
+    val topics = sc.textFile("file://" + path + "rcv1-v2.topics.qrels")
 
     val selected = Parameters.SELECT_LABEL
 
@@ -39,11 +41,11 @@ object Data {
 
   def test_accuracy(sc: SparkContext, path: String, weights: Array[Double]): (Double, Double, Double) = {
     val testIndex = 0 until 4
-    val topics = sc.textFile(path + "rcv1-v2.topics.qrels")
+    val topics = sc.textFile("file://" + path + "rcv1-v2.topics.qrels")
 
     //Read the 4 test files and perform the accuracy computation
     val rdds = testIndex.map(i => {
-      val datalines = sc.textFile(path + "lyrl2004_vectors_test_pt" + i + ".dat")
+      val datalines = sc.textFile("file://" + path + "lyrl2004_vectors_test_pt" + i + ".dat")
       val selected = Parameters.SELECT_LABEL
       val labels = topics.map(line => {
         val split = line.split(" ")
@@ -65,7 +67,7 @@ object Data {
       })
       data.join(labels)
     })
-    val (tp, tn, pos, neg) = rdds.map(SVM.accuracy(_, weights)).reduce((x, y) => (x._1 + y._1, x._2 + y._2, x._3 + y._3, x._4 + y._4))
+    val (tp, tn, pos, neg) = rdds.map(accuracy(_, weights)).reduce((x, y) => (x._1 + y._1, x._2 + y._2, x._3 + y._3, x._4 + y._4))
     ((tp + tn).toDouble / (pos + neg), tp.toDouble / pos, tn.toDouble / neg)
   }
 }

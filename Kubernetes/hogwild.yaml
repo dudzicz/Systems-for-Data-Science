@@ -1,0 +1,25 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: hogwild
+spec:
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: cs449g1-scratch
+  containers:
+    - name: hogwild
+      image: dudzicz/cs449g1:latest
+      resources:
+        requests:
+          memory: "20Gi"
+          cpu: "4000m"
+        limits:
+          memory: "20Gi"
+          cpu: "4000m"
+      volumeMounts:
+        - mountPath: /data
+          name: data
+      stdin: true
+      tty: true
+      command: ["/bin/sh"]
