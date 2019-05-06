@@ -1,18 +1,24 @@
 #!/bin/bash
 
+check_pod() {
+    kubectl get pods ${1} 2>&1 > /dev/null
+    return $?
+}
+
+check_pod data-pod
+
+
+
 delete_pod () {
     POD=${1}
-    kubectl get pods ${POD} 2>&1 > /dev/null
-    err=$?
-    if [[ ${err} -eq 0 ]]
-    then
-        echo "Deleting existing pod \"${POD}\""
-        kubectl delete pods ${POD} 2>&1 > /dev/null
-        while kubectl get pod ${POD} 2>&1 > /dev/null
-        do
-            sleep 1
-        done
-    fi
+    echo "Deleting pod \"${POD}\""
+    kubectl delete pods ${POD} 2>&1 > /dev/null
+    while
+        check_pod ${POD}
+        [[ $? -eq 0 ]]
+    do
+        sleep 1
+    done
 }
 
 create_pod () {
@@ -25,6 +31,17 @@ create_pod () {
         sleep 1
     done
 }
+
+fetch_log() {
+    echo "Fetching logs..."
+    check_pod ${1}
+    if [[ $? -ne 0 ]]
+    then
+        create_pod data-pod Kubernetes/data_pod.yaml
+    fi
+    kubectl cp cs449g1/data-pod:/data/log/ logs/
+}
+
 
 if [[ $# -lt 3 ]]
 then
@@ -40,13 +57,15 @@ then
     delete_pod svm-${WORKERS}-${BATCH_SIZE}
     echo "Running distributed SGD with $WORKERS workers and $BATCH_SIZE batch size"
     ${SPARK_HOME}/bin/spark-submit --class main.Main --properties-file Spark/spark_conf --conf spark.executor.instances=${WORKERS} --conf spark.kubernetes.driver.pod.name=svm-${WORKERS}-${BATCH_SIZE} local:///data/app/SVM.jar distributed ${BATCH_SIZE}
-    kubectl cp cs449g1/data-pod:/data/log/${WORKERS}_${BATCH_SIZE} logs/${WORKERS}_${BATCH_SIZE}
+    fetch_log
 elif [[ ${MODE} = "hogwild" ]]
 then
     delete_pod hogwild
     create_pod hogwild Kubernetes/hogwild.yaml
     echo "Running hogwild SGD with $WORKERS workers and $BATCH_SIZE batch size"
     kubectl exec -it hogwild -- scala -J-Xmx16g /data/app/SVM.jar hogwild ${WORKERS} ${BATCH_SIZE}
+    delete_pod hogwild
+    fetch_log
 else
-    echo "Invalid mode: ${MODE}. Exected \"distributed\" or \"hogwild\""
+    echo "Invalid mode: ${MODE}. Expected \"distributed\" or \"hogwild\""
 fi

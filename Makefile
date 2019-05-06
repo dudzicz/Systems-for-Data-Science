@@ -3,6 +3,9 @@ SOURCES = $(shell find src/main/scala -name '*.scala')
 
 all: build update
 
+data-pod:
+	kubectl create -f Kubernetes/data_pod.yaml
+
 build: $(SOURCES)
 	sbt package
 
@@ -12,6 +15,4 @@ update: target/scala-2.11/project_2.11-0.1.jar
 clean:
 	rm -rf target/
 
-image:
-	docker build -t dudzicz/cs449g1:latest -f Docker/Dockerfile .
-	docker push dudzicz/cs449g1:latest
+fetch_logs:
