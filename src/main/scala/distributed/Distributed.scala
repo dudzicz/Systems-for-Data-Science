@@ -4,7 +4,7 @@ import java.io.FileWriter
 
 import distributed.Data.{load_data, test_accuracy}
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
-import svm.SVM.{loss, merge, svm, update_weight}
+import SVM.{loss, merge, svm, update_weight}
 
 import scala.util.Random
 import scala.util.control.Breaks._

@@ -3,9 +3,9 @@ package hogwild
 import java.io.FileWriter
 import java.util.concurrent.{CountDownLatch, Executors}
 
+import distributed.SVM.{loss, svm}
 import hogwild.Data.{load_data, test_accuracy}
 import main.Parameters._
-import svm.SVM.{loss, svm}
 
 import scala.util.Random
 import scala.util.control.Breaks._
@@ -28,7 +28,7 @@ object Hogwild {
     var weights = Array.fill(dimensions)(0.0)
     var best_loss: Double = Double.MaxValue
     var patience_counter: Int = 0
-    var counter = new CountDownLatch(batch_size)
+    var counter = new CountDownLatch(workers * batch_size)
 
     var gradient = Array.fill(dimensions)((0.0, 0))
     @volatile var done = false
@@ -52,8 +52,8 @@ object Hogwild {
         counter.await()
         val g = gradient.clone()
         gradient = Array.fill(dimensions)((0.0, 0))
-        counter = new CountDownLatch(batch_size)
-        update_weight(weights, g, LEARNING_RATE)
+        counter = new CountDownLatch(workers * batch_size)
+        update_weight(weights, g, LEARNING_RATE, LAMBDA, batch_size, workers)
         log(logfile, e, "START")
         val losses = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
         val tl = losses.sum / losses.length
@@ -102,11 +102,11 @@ object Hogwild {
     }
   }
 
-  def update_weight(weights: Array[Double], gradient: Array[(Double, Int)], gamma: Double): Unit = {
+  def update_weight(weights: Array[Double], gradient: Array[(Double, Int)], gamma: Double, lambda: Double, batch_size: Double, workers: Int): Unit = {
     for (i <- weights.indices) {
       val g = gradient(i)
       if (g._2 != 0) {
-        weights(i) -= gamma * g._1 / g._2
+        weights(i) -= gamma * (g._1 / g._2)
       }
     }
   }
