@@ -18,26 +18,28 @@ object Hogwild {
     val fileName = LOG_PATH + "/hogwild/" + workers + "_" + batch_size
     val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers, batch_size)
+
     val (d, dimensions) = load_data(DATA_PATH)
     val random = new Random(SEED)
     val data = random.shuffle(d).toArray
     val N = (data.length * VALIDATION_RATIO).toInt
-    val (train_set, validation_set) = data.splitAt(N)
+    val (validation_set, train_set) = data.splitAt(N)
 
     // Initialization and broadcast of the variables
-    var weights = Array.fill(dimensions)(0.0)
+    val weights = Array.fill(dimensions)(0.0)
     var best_loss: Double = Double.MaxValue
     var patience_counter: Int = 0
     var counter = new CountDownLatch(workers * batch_size)
 
     var gradient = Array.fill(dimensions)((0.0, 0))
+
     @volatile var done = false
     for (w <- 0 until workers) {
       pool.execute(new Runnable {
         override def run(): Unit = {
           while (!done) {
-            val i = random.nextInt(N)
-            val (_, (x, y)) = data(i)
+            val i = random.nextInt(train_set.length)
+            val (_, (x, y)) = train_set(i)
             val g = svm(x, y, weights, LAMBDA)
             update_grad(gradient, g)
             counter.countDown()
