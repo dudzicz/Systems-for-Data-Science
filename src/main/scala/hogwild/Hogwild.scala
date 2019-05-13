@@ -15,7 +15,7 @@ object Hogwild {
   def main(workers: Int, batch_size: Int): Unit = {
     val pool = Executors.newFixedThreadPool(workers)
 
-    val fileName = "/data/log/hogwild/" + workers + "_" + batch_size
+    val fileName = LOG_PATH + "/hogwild/" + workers + "_" + batch_size
     val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers, batch_size)
     val (d, dimensions) = load_data(DATA_PATH)

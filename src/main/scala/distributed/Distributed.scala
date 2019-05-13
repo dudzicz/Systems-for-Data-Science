@@ -21,7 +21,7 @@ object Distributed {
     //with our system parameters
     val workers = conf.getInt("spark.executor.instances", 1)
 
-    val fileName = "/data/log/distributed/" + workers + "_" + batch_size
+    val fileName = LOG_PATH + "/distributed/" + workers + "_" + batch_size
     val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers, batch_size)
 
