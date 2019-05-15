@@ -10,7 +10,7 @@ object SVM {
     val we = select(x, w)
     val a = 1 - y * scalar_product(we, xe)
     max(a, 0) + lambda * we.map(i => i * i).sum
-  }
+}
 
   def svm(x: Map[Int, Double], y: Int, w: Array[Double], lambda: Double): Map[Int, Double] = {
     val xe = x.values.toList

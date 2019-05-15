@@ -2,13 +2,15 @@ package hogwild
 
 import java.io.FileWriter
 import java.util.concurrent.{CountDownLatch, Executors}
+
 import hogwild.Data.{load_data, test_accuracy}
+import hogwild.Hogwild.splitRange
 import main.Parameters._
+import svm.SVM._
 
 import scala.collection.concurrent.TrieMap
 import scala.util.Random
 import scala.util.control.Breaks._
-import svm.SVM._
 
 object Hogwild_lock {
 
@@ -23,22 +25,26 @@ object Hogwild_lock {
     val random = new Random(SEED)
     val data = random.shuffle(d).toArray
     val N = (data.length * VALIDATION_RATIO).toInt
+    val B = workers * batch_size
     val (validation_set, train_set) = data.splitAt(N)
 
     // Initialization and broadcast of the variables
     val weights = Array.fill(dimensions)(0.0)
     var best_loss: Double = Double.MaxValue
     var patience_counter: Int = 0
-    var counter = new CountDownLatch(workers * batch_size)
+    var counter = new CountDownLatch(B)
+    val indices = splitRange(train_set.indices, workers)
 
     var gradient = new TrieMap[Int, (Double, Int)]()
 
     @volatile var done = false
     for (w <- 0 until workers) {
       pool.execute(new Runnable {
+        var ind = indices(w)
         override def run(): Unit = {
           while (!done) {
-            val i = random.nextInt(train_set.length)
+            val i = ind.head
+            ind = ind.tail
             val (_, (x, y)) = train_set(i)
             val g = svm(x, y, weights, LAMBDA)
             update_grad(gradient, g)
@@ -52,13 +58,12 @@ object Hogwild_lock {
     breakable {
       for (e <- 0 to EPOCHS) {
         counter.await()
-        val g = gradient.synchronized {
-          val p = gradient.clone()
+        gradient.synchronized {
+          update_weight(weights, gradient, LEARNING_RATE, LAMBDA, batch_size, workers)
           gradient = new TrieMap[Int, (Double, Int)]()
-          counter = new CountDownLatch(workers * batch_size)
-          p
+          counter = new CountDownLatch(B)
         }
-        update_weight(weights, g, LEARNING_RATE, LAMBDA, batch_size, workers)
+
         log(logfile, e, "START")
         val losses = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
         val tl = losses.sum / losses.length
@@ -117,4 +122,11 @@ object Hogwild_lock {
     }
   }
 
+  def splitRange(r: Range, chunks: Int): Array[Stream[Int]] = {
+    val nchunks = scala.math.max(chunks, 1)
+    val chunkSize = scala.math.max(r.length / nchunks, 1)
+    val starts = r.by(chunkSize).take(nchunks)
+    val ends = starts.map(_ - 1).drop(1) :+ r.end
+    starts.zip(ends).map(x => Stream.continually(Stream.range(x._1, x._2)).flatten).toArray
+  }
 }

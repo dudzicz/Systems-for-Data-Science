@@ -30,15 +30,19 @@ object Hogwild {
     var best_loss: Double = Double.MaxValue
     var patience_counter: Int = 0
     var counter = new CountDownLatch(workers * batch_size)
+    val indices = splitRange(train_set.indices, workers)
 
     var gradient = new TrieMap[Int,(Double,Int)]()
 
     @volatile var done = false
     for (w <- 0 until workers) {
       pool.execute(new Runnable {
+        var ind = indices(w)
+
         override def run(): Unit = {
           while (!done) {
-            val i = random.nextInt(train_set.length)
+            val i = ind.head
+            ind = ind.tail
             val (_, (x, y)) = train_set(i)
             val g = svm(x, y, weights, LAMBDA)
             update_grad(gradient, g)
@@ -110,6 +114,14 @@ object Hogwild {
       val g = gradient(i)
         weights(i) -= gamma * (g._1 / g._2)
     }
+  }
+
+  def splitRange(r: Range, chunks: Int): Array[Stream[Int]] = {
+    val nchunks = scala.math.max(chunks, 1)
+    val chunkSize = scala.math.max(r.length / nchunks, 1)
+    val starts = r.by(chunkSize).take(nchunks)
+    val ends = starts.map(_ - 1).drop(1) :+ r.end
+    starts.zip(ends).map(x => Stream.continually(Stream.range(x._1, x._2)).flatten).toArray
   }
 
 }
