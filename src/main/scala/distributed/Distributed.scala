@@ -3,12 +3,12 @@ package distributed
 import java.io.FileWriter
 
 import distributed.Data.{load_data, test_accuracy}
+import main.Parameters._
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
+import svm.SVM._
 
 import scala.util.Random
 import scala.util.control.Breaks._
-import main.Parameters._
-import svm.SVM._
 
 object Distributed {
 

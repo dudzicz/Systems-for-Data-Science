@@ -3,10 +3,9 @@ package hogwild
 import java.io.FileWriter
 import java.util.concurrent.Executors
 
-import hogwild.Data.load_data
+import hogwild.Data.{load_data, test_accuracy}
 import main.Parameters._
 import svm.SVM._
-import hogwild.Data.test_accuracy
 
 import scala.util.Random
 
