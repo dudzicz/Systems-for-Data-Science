@@ -1,7 +1,7 @@
 package main
 
 import distributed.Distributed
-import hogwild.Hogwild
+import hogwild.{Hogwild, Hogwild_lock}
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -13,12 +13,17 @@ object Main {
       if (args.length != 3){
         println("Usage : scala SVM.jar hogwild <workers> <batch_size>")
       }
-      Hogwild.main(args(1).toInt, args(2).toInt)
+      Hogwild.run(args(1).toInt, args(2).toInt)
     } else if (mode.equals("distributed")) {
       if (args.length != 2){
         println("Usage : scala SVM.jar distributed <batch_size>")
       }
       Distributed.run(args(1).toInt)
+    } else if (mode.equals("lock")) {
+      if (args.length != 3){
+        println("Usage : scala SVM.jar lock <workers> <batch_size>")
+      }
+      Hogwild_lock.run(args(1).toInt, args(2).toInt)
     } else {
       throw new IllegalArgumentException()
     }

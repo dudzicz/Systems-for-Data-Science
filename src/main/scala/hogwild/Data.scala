@@ -3,7 +3,7 @@ package hogwild
 import java.lang.Integer.max
 
 import main.Parameters
-import hogwild.SVM.predict
+import svm.SVM.predict
 
 import scala.io.Source
 

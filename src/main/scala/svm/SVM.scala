@@ -1,4 +1,4 @@
-package distributed
+package svm
 
 import java.lang.Double.max
 

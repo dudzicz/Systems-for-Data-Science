@@ -5,17 +5,17 @@ import java.util.concurrent.{CountDownLatch, Executors}
 import hogwild.Data.{load_data, test_accuracy}
 import main.Parameters._
 
+import scala.collection.concurrent.TrieMap
 import scala.util.Random
 import scala.util.control.Breaks._
-import scala.collection.concurrent.TrieMap
 import svm.SVM._
 
-object Hogwild {
+object Hogwild_lock {
 
   def run(workers: Int, batch_size: Int): Unit = {
     val pool = Executors.newFixedThreadPool(workers)
 
-    val fileName = LOG_PATH + "/hogwild/" + workers + "_" + batch_size
+    val fileName = LOG_PATH + "/lock/" + workers + "_" + batch_size
     val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers, batch_size)
 
@@ -31,7 +31,7 @@ object Hogwild {
     var patience_counter: Int = 0
     var counter = new CountDownLatch(workers * batch_size)
 
-    var gradient = new TrieMap[Int,(Double,Int)]()
+    var gradient = new TrieMap[Int, (Double, Int)]()
 
     @volatile var done = false
     for (w <- 0 until workers) {
@@ -52,9 +52,12 @@ object Hogwild {
     breakable {
       for (e <- 0 to EPOCHS) {
         counter.await()
-        val g = gradient.clone()
-        gradient = new TrieMap[Int,(Double,Int)]()
-        counter = new CountDownLatch(workers * batch_size)
+        val g = gradient.synchronized {
+          val p = gradient.clone()
+          gradient = new TrieMap[Int, (Double, Int)]()
+          counter = new CountDownLatch(workers * batch_size)
+          p
+        }
         update_weight(weights, g, LEARNING_RATE, LAMBDA, batch_size, workers)
         log(logfile, e, "START")
         val losses = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
@@ -98,17 +101,19 @@ object Hogwild {
     logfile.append("SVM PARAMETERS " + "WORKERS=" + workers + ",EPOCHS=" + EPOCHS + ",BATCH_SIZE=" + batch_size + ",LEARNING_RATE=" + LEARNING_RATE + ",PATIENCE=" + PATIENCE + "\n")
   }
 
-  def update_grad(gradient: TrieMap[Int,(Double, Int)], delta: Map[Int, Double]): Unit = {
-    for ((a, b) <- delta) {
-      val g = gradient.getOrElse(a,(0.0,0))
-      gradient.update(a, (g._1 + b, g._2 + 1))
+  def update_grad(gradient: TrieMap[Int, (Double, Int)], delta: Map[Int, Double]): Unit = {
+    gradient.synchronized {
+      for ((a, b) <- delta) {
+        val g = gradient.getOrElse(a, (0.0, 0))
+        gradient.update(a, (g._1 + b, g._2 + 1))
+      }
     }
   }
 
-  def update_weight(weights: Array[Double], gradient: TrieMap[Int,(Double, Int)], gamma: Double, lambda: Double, batch_size: Double, workers: Int): Unit = {
+  def update_weight(weights: Array[Double], gradient: TrieMap[Int, (Double, Int)], gamma: Double, lambda: Double, batch_size: Double, workers: Int): Unit = {
     for (i <- gradient.keys) {
       val g = gradient(i)
-        weights(i) -= gamma * (g._1 / g._2)
+      weights(i) -= gamma * (g._1 / g._2)
     }
   }
 
