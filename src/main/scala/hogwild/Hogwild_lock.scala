@@ -35,15 +35,15 @@ object Hogwild_lock {
     def runner(id: Int): Unit = {
       var ind: Stream[Int] = indices(id)
       while (!done) {
-        weights.synchronized() {
-          val w = weights.clone()
+        val w = weights.synchronized {
+          weights.clone()
         }
         val i = ind.take(batch_size)
         ind = ind.drop(batch_size)
         val g = i.map(train_set(_)).map(p => svm(p._2._1, p._2._2, w, LAMBDA)).map(x => x.map { case (k, v) => k -> (v, 1) }).reduce(merge)
         update_weight(weights, g, LEARNING_RATE, LAMBDA, batch_size, workers)
-        weights.synchronized() {
-          val wu = weights.clone()
+        val wu = weights.synchronized {
+          weights.clone()
         }
         //val losses = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
         //val tl = losses.sum / losses.length
@@ -81,7 +81,7 @@ object Hogwild_lock {
   }
 
   def update_weight(weights: Array[Double], gradient: Map[Int, (Double, Int)], gamma: Double, lambda: Double, batch_size: Double, workers: Int): Unit = {
-    weights.synchronized() {
+    weights.synchronized {
       for (i <- gradient.keys) {
         val g = gradient(i)
         weights(i) -= gamma * (g._1 / g._2)
