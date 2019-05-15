@@ -32,17 +32,23 @@ object Hogwild {
     val indices = splitRange(train_set.indices, workers)
     @volatile var done = false
 
+    val worker_size = train_set.size/workers
+
     def runner(id: Int): Unit = {
-      var ind: Stream[Int] = indices(id)
+      var step = 0
       while (!done) {
+        if (step*batch_size>worker_size){
+          step = 0
+        }
+
         val w = weights.clone()
-        val i = ind.take(batch_size)
-        ind = ind.drop(batch_size)
-        val g = i.map(train_set(_)).map(p => svm(p._2._1, p._2._2, w, LAMBDA)).map(x => x.map { case (k, v) => k -> (v, 1) }).reduce(merge)
+
+        val start = id * worker_size + step*batch_size
+        val x = train_set.slice(start,start + batch_size)
+
+        val g = x.map(p => svm(p._2._1, p._2._2, w, LAMBDA)).map(x => x.map { case (k, v) => k -> (v, 1) }).reduce(merge)
         update_weight(weights, g, LEARNING_RATE, LAMBDA, batch_size, workers)
         val wu = weights.clone()
-        //val losses = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
-        //val tl = losses.sum / losses.length
 
         val val_loss = validation_set.map(p => loss(p._2._1, p._2._2, wu, LAMBDA))
         val vl = val_loss.sum / N
@@ -50,6 +56,7 @@ object Hogwild {
         if (early_stop(vl)) {
           done = true
         }
+        step = step +1
       }
     }
 
