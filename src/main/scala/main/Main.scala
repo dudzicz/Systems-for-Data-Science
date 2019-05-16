@@ -1,6 +1,6 @@
 package main
 
-import distributed.Distributed
+import spark.Spark
 import hogwild.{Hogwild, Hogwild_lock}
 
 object Main {
@@ -14,11 +14,11 @@ object Main {
         println("Usage : scala SVM.jar hogwild <workers> <batch_size>")
       }
       Hogwild.run(args(1).toInt, args(2).toInt)
-    } else if (mode.equals("distributed")) {
+    } else if (mode.equals("spark")) {
       if (args.length != 2) {
         println("Usage : scala SVM.jar distributed <batch_size>")
       }
-      Distributed.run(args(1).toInt)
+      Spark.run(args(1).toInt)
     } else if (mode.equals("lock")) {
       if (args.length != 3) {
         println("Usage : scala SVM.jar lock <workers> <batch_size>")

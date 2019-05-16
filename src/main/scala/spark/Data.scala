@@ -1,4 +1,4 @@
-package distributed
+package spark
 
 import java.lang.Integer.max
 

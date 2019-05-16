@@ -1,21 +1,18 @@
 package hogwild
 
 import java.io.FileWriter
-import java.util.concurrent.Executors
 
 import hogwild.Data.{load_data, test_accuracy}
 import main.Parameters._
 import svm.SVM._
 
+import scala.concurrent.Lock
 import scala.util.Random
 
 object Hogwild_lock {
 
-  var best_loss: Double = Double.MaxValue
-  var patience_counter: Int = 0
 
   def run(workers: Int, batch_size: Int): Unit = {
-    val pool = Executors.newFixedThreadPool(workers)
 
     val fileName = LOG_PATH + "/lock/" + workers + "_" + batch_size
     val logfile = new FileWriter(fileName, false)
@@ -26,34 +23,44 @@ object Hogwild_lock {
     val data = random.shuffle(d).toArray
     val N = (data.length * VALIDATION_RATIO).toInt
     val (validation_set, train_set) = data.splitAt(N)
-
-    // Initialization and broadcast of the variables
+    val lock = new Lock() // Initialization and broadcast of the variables
     val weights = Array.fill(dimensions)(0.0)
     val indices = splitRange(train_set.indices, workers)
     @volatile var done = false
 
-    def runner(id: Int): Unit = {
-      var ind: Stream[Int] = indices(id)
-      while (!done) {
-        val w = weights.synchronized {
-          weights.clone()
+    var best_loss: Double = Double.MaxValue
+    var patience_counter: Int = 0
+
+    def early_stop(vl: Double): Boolean = {
+      if (vl > best_loss && patience_counter == PATIENCE) {
+        true
+      } else {
+        if (vl > best_loss - EARLY_STOP_THRESHOLD) {
+          patience_counter = patience_counter + 1
+        } else {
+          patience_counter = 1
+          best_loss = vl
         }
+        false
+      }
+    }
+
+    def runner(id: Int): Unit = {
+      var ind = indices(id)
+      while (!done) {
         val i = ind.take(batch_size)
         ind = ind.drop(batch_size)
-        val g = i.map(train_set(_)).map(p => svm(p._2._1, p._2._2, w, LAMBDA)).map(x => x.map { case (k, v) => k -> (v, 1) }).reduce(merge)
-        update_weight(weights, g, LEARNING_RATE, LAMBDA, batch_size, workers)
-        val wu = weights.synchronized {
-          weights.clone()
-        }
-        //val losses = train_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
-        //val tl = losses.sum / losses.length
-
-        val val_loss = validation_set.map(p => loss(p._2._1, p._2._2, wu, LAMBDA))
+        lock.acquire()
+        val g = i.map(train_set(_)).map(p => svm(p._2._1, p._2._2, weights, LAMBDA)).map(x => x.map { case (k, v) => k -> (v, 1) }).reduce(merge)
+        update_weight(weights, g, LEARNING_RATE)
+        val val_loss = validation_set.map(p => loss(p._2._1, p._2._2, weights, LAMBDA))
+        lock.release()
         val vl = val_loss.sum / N
         log(logfile, "SUMMARY(vl=" + vl + ")")
         if (early_stop(vl)) {
           done = true
         }
+
       }
     }
 
@@ -80,12 +87,10 @@ object Hogwild_lock {
     logfile.append("SVM PARAMETERS " + "WORKERS=" + workers + ",EPOCHS=" + EPOCHS + ",BATCH_SIZE=" + batch_size + ",LEARNING_RATE=" + LEARNING_RATE + ",PATIENCE=" + PATIENCE + "\n")
   }
 
-  def update_weight(weights: Array[Double], gradient: Map[Int, (Double, Int)], gamma: Double, lambda: Double, batch_size: Double, workers: Int): Unit = {
-    weights.synchronized {
-      for (i <- gradient.keys) {
-        val g = gradient(i)
-        weights(i) -= gamma * (g._1 / g._2)
-      }
+  def update_weight(weights: Array[Double], gradient: Map[Int, (Double, Int)], gamma: Double): Unit = {
+    for (i <- gradient.keys) {
+      val g = gradient(i)
+      weights(i) -= gamma * (g._1 / g._2)
     }
   }
 
@@ -103,18 +108,5 @@ object Hogwild_lock {
     }
   }
 
-  def early_stop(vl: Double): Boolean = {
-    if (vl > best_loss && patience_counter == PATIENCE) {
-      true
-    } else {
-      if (vl > best_loss - EARLY_STOP_THRESHOLD) {
-        patience_counter = patience_counter + 1
-      } else {
-        patience_counter = 1
-        best_loss = vl
-      }
-      false
-    }
-  }
 
 }

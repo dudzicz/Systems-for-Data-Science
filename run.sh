@@ -58,12 +58,12 @@ then
     echo "Running distributed SGD with $WORKERS workers and $BATCH_SIZE batch size"
     ${SPARK_HOME}/bin/spark-submit --class main.Main --properties-file Spark/spark_conf --conf spark.executor.instances=${WORKERS} --conf spark.kubernetes.driver.pod.name=svm-${WORKERS}-${BATCH_SIZE} local:///data/app/SVM.jar distributed ${BATCH_SIZE}
     fetch_log
-elif [[ ${MODE} = "hogwild" ]]
+elif [[ ${MODE} = "hogwild" || ${MODE} = "lock" ]]
 then
     delete_pod hogwild
     create_pod hogwild Kubernetes/hogwild.yaml
     echo "Running hogwild SGD with $WORKERS workers and $BATCH_SIZE batch size"
-    kubectl exec -it hogwild -- scala -J-Xmx16g /data/app/SVM.jar hogwild ${WORKERS} ${BATCH_SIZE}
+    kubectl exec -it hogwild -- scala -J-Xmx9g /data/app/SVM.jar ${MODE} ${WORKERS} ${BATCH_SIZE}
     delete_pod hogwild
     fetch_log
 else

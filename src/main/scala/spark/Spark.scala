@@ -1,8 +1,8 @@
-package distributed
+package spark
 
 import java.io.FileWriter
 
-import distributed.Data.{load_data, test_accuracy}
+import spark.Data.{load_data, test_accuracy}
 import main.Parameters._
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import svm.SVM._
@@ -10,7 +10,7 @@ import svm.SVM._
 import scala.util.Random
 import scala.util.control.Breaks._
 
-object Distributed {
+object Spark {
 
   def run(batch_size: Int): Unit = {
 
@@ -21,7 +21,7 @@ object Distributed {
     //with our system parameters
     val workers = conf.getInt("spark.executor.instances", 1)
 
-    val fileName = LOG_PATH + "/distributed/" + workers + "_" + batch_size
+    val fileName = LOG_PATH + "/spark/" + workers + "_" + batch_size
     val logfile = new FileWriter(fileName, false)
     logParams(logfile, workers, batch_size)
 
