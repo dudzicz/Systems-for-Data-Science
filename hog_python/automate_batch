@@ -1,0 +1,13 @@
+for worker in 20
+
+do 
+
+for mode in synchronous
+
+do
+bash run.sh -n $worker -r $mode -w cluster
+
+done
+done
+
+echo DOOONE

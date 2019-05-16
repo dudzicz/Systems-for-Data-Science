@@ -1,0 +1,75 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coordinator-service-bis
+  labels:
+    app: coordinator-service-bis
+spec:
+  ports:
+    - port: 80
+      name: coordinator-bis
+  clusterIP: None
+  selector:
+    app: coordinator-service-bis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: coordinator-bis
+  labels:
+    app: coordinator-service-bis
+spec:
+  serviceName: "coordinator-service-bis"
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: coordinator-service-bis
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: coordinator-service-bis
+    spec:
+      containers:
+        - name: coordinator-service-bis
+          image: karna2605/karna_hog:latest
+          env:
+            - name: N_WORKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: replicas
+            - name: RUNNING_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: running_mode
+            - name: DATA_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: data_path
+            - name: WHERE
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: running_where
+          resources:
+            requests:
+              memory: "20Gi"
+              cpu: "4000m"
+            limits:
+              memory: "20Gi"
+              cpu: "4000m"
+          ports:
+            - containerPort: 80
+              name: coordinator-bis
+          command: ["python", "hogwild-python/src/hogwild/coordinator.py"]
+          volumeMounts:
+            - name: shared-volume-bis
+              mountPath: /data
+      volumes:
+        - name: shared-volume-bis
+          persistentVolumeClaim:
+            claimName: cs449g1-scratch

@@ -1,0 +1,75 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workers-service-bis
+  labels:
+    app: workers-service-bis
+spec:
+  ports:
+    - port: 80
+      name: worker-bis
+  clusterIP: None
+  selector:
+    app: workers-service-bis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: worker-bis
+  labels:
+    app: workers-service-bis
+spec:
+  serviceName: "workers-service-bis"
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: workers-service-bis
+  replicas: 5
+  template:
+    metadata:
+      labels:
+        app: workers-service-bis
+    spec:
+      containers:
+        - name: workers-service-bis
+          image: karna2605/karna_hog:latest
+          env:
+            - name: N_WORKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: replicas
+            - name: RUNNING_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: running_mode
+            - name: DATA_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: data_path
+            - name: WHERE
+              valueFrom:
+                configMapKeyRef:
+                  name: hogwild-config-bis
+                  key: running_where
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "500m"
+          ports:
+            - containerPort: 80
+              name: worker-bis
+          command: ["python", "hogwild-python/src/hogwild/worker.py", "80"]
+          volumeMounts:
+            - name: shared-volume-bis
+              mountPath: /data
+      volumes:
+        - name: shared-volume-bis
+          persistentVolumeClaim:
+            claimName: cs449g1-scratch
