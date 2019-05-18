@@ -2,66 +2,95 @@ package hogwild
 
 import java.io.FileWriter
 
-import hogwild.Data.{load_data, test_accuracy}
-import main.Parameters._
-import svm.SVM._
+import hogwild.Data.{loadData, testAccuracy}
+import hogwild.Log.log
+import hogwild.Parameters._
+import hogwild.SVM._
 
+import scala.concurrent.Lock
 import scala.util.Random
 
+/**
+  * An object giving static methods to run Hogwild an a local machine.
+  */
 object Hogwild {
 
-
-  def run(workers: Int, batch_size: Int): Unit = {
-
-    val fileName = LOG_PATH + "/hogwild/" + workers + "_" + batch_size
-    val logfile = new FileWriter(fileName, false)
-    logParams(logfile, workers, batch_size)
-
-    val (d, dimensions) = load_data(DATA_PATH)
+  /**
+    * Runs the hogwild SVM with the given parameters.
+    *
+    * @param workers   the number of workers to use
+    * @param batchSize the batch size
+    * @param locking   whether to use locking or not
+    */
+  def run(workers: Int, batchSize: Int, locking: Boolean): Unit = {
     val random = new Random(SEED)
-    val data = random.shuffle(d).toArray
-    val N = (data.length * VALIDATION_RATIO).toInt
-    val (validation_set, train_set) = data.splitAt(N)
 
-    // Initialization and broadcast of the variables
+    val logfileName = LOG_PATH + "/hogwild/" + workers + "_" + batchSize
+    val logfile = new FileWriter(logfileName, false)
+    log(logfile, workers, batchSize)
+
+    val (data, dimensions) = loadData(DATA_PATH)
+    val validationSize = (data.length * VALIDATION_RATIO).toInt
+    val (validationSet, trainSet) = random.shuffle(data).toArray.splitAt(validationSize)
+
     val weights = Array.fill(dimensions)(0.0)
-    val indices = splitRange(train_set.indices, workers)
+    val workerIndices = splitRange(trainSet.indices, workers)
+    val lock = new Lock()
     @volatile var done = false
 
-    var best_loss: Double = Double.MaxValue
-    var patience_counter: Int = 0
+    var bestLoss = Double.MaxValue
+    var patienceCounter = 0
 
-    def early_stop(vl: Double): Boolean = {
-      if (vl > best_loss && patience_counter == PATIENCE) {
+    /**
+      * Decides the early stopping of the model training.
+      *
+      * @param validationLoss the last validation loss
+      * @return true if the model training should stop, false otherwise
+      */
+    def early_stop(validationLoss: Double): Boolean = {
+      if (validationLoss > bestLoss && patienceCounter == PATIENCE) {
         true
       } else {
-        if (vl > best_loss - EARLY_STOP_THRESHOLD) {
-          patience_counter = patience_counter + 1
+        if (validationLoss > bestLoss - EARLY_STOP_THRESHOLD) {
+          patienceCounter = patienceCounter + 1
         } else {
-          patience_counter = 1
-          best_loss = vl
+          patienceCounter = 1
+          bestLoss = validationLoss
         }
         false
       }
     }
 
+    /**
+      * Defines the workers' execution flow.
+      *
+      * @param id the id of the worker
+      */
     def runner(id: Int): Unit = {
-      var ind = indices(id)
+      var indices = workerIndices(id)
       while (!done) {
+        val batch = indices.take(batchSize).map(trainSet(_))
+        indices = indices.drop(batchSize)
 
-        val w = weights.clone()
+        if (locking) lock.acquire()
+        val workerWeights = weights.clone()
+        if (locking) lock.release()
 
-        val i = ind.take(batch_size)
-        ind = ind.drop(batch_size)
-        val g = i.map(train_set(_)).map(p => svm(p._2._1, p._2._2, w, LAMBDA)).map(x => x.map { case (k, v) => k -> (v, 1) }).reduce(merge)
-        update_weight(weights, g, LEARNING_RATE)
-        val wu = weights.clone()
-        val val_loss = validation_set.map(p => loss(p._2._1, p._2._2, wu, LAMBDA))
-        val vl = val_loss.sum / N
-        log(logfile, "SUMMARY(vl=" + vl + ")")
-        if (early_stop(vl)) {
+
+        val gradient = batch.map(sparseGradient(_, workerWeights, LAMBDA)).map(expandSparseGradient).reduce(mergeSparseGradient)
+
+        if (locking) lock.acquire()
+        updateWeight(weights, gradient, LEARNING_RATE)
+        val validationWeights = weights.clone()
+        if (locking) lock.release()
+
+        val validationLoss = validationSet.map(loss(_, validationWeights, LAMBDA)).sum / validationSize
+
+        if (early_stop(validationLoss)) {
           done = true
         }
+
+        log(logfile, "SUMMARY(vl=" + validationLoss + ")")
       }
     }
 
@@ -74,40 +103,24 @@ object Hogwild {
     threads.foreach(_.start())
     threads.foreach(_.join())
 
-    //Final computation of the accuracy at the end of all computations
-    val (acc, pos_acc, neg_acc) = test_accuracy(DATA_PATH, weights)
+    val (acc, pos_acc, neg_acc) = testAccuracy(DATA_PATH, weights)
     log(logfile, "ACCURACY(acc=" + acc + ",+acc=" + pos_acc + ",-acc=" + neg_acc + ")")
     logfile.flush()
   }
 
-  def log(logfile: FileWriter, message: String): Unit = {
-    logfile.append("SVM " + message + " " + System.nanoTime() + "\n")
+  /**
+    * Splits the given range into equal size chunks.
+    *
+    * @param range the range to split
+    * @param n     the number of chunks
+    * @return an Array of infinite Stream on the chunked ranges
+    */
+  def splitRange(range: Range, n: Int): Array[Stream[Int]] = {
+    val nchunks = scala.math.max(n, 1)
+    val chunkSize = scala.math.max(range.length / nchunks, 1)
+    val starts = range.by(chunkSize).take(nchunks)
+    val ends = starts.map(_ - 1).drop(1) :+ range.end
+    starts.zip(ends).map { case (start, end) => Stream.continually(Stream.range(start, end)).flatten }.toArray
   }
-
-  def logParams(logfile: FileWriter, workers: Int, batch_size: Int): Unit = {
-    logfile.append("SVM PARAMETERS " + "WORKERS=" + workers + ",EPOCHS=" + EPOCHS + ",BATCH_SIZE=" + batch_size + ",LEARNING_RATE=" + LEARNING_RATE + ",PATIENCE=" + PATIENCE + "\n")
-  }
-
-  def update_weight(weights: Array[Double], gradient: Map[Int, (Double, Int)], gamma: Double): Unit = {
-    for (i <- gradient.keys) {
-      val g = gradient(i)
-      weights(i) -= gamma * (g._1 / g._2)
-    }
-  }
-
-  def splitRange(r: Range, chunks: Int): Array[Stream[Int]] = {
-    val nchunks = scala.math.max(chunks, 1)
-    val chunkSize = scala.math.max(r.length / nchunks, 1)
-    val starts = r.by(chunkSize).take(nchunks)
-    val ends = starts.map(_ - 1).drop(1) :+ r.end
-    starts.zip(ends).map(x => Stream.continually(Stream.range(x._1, x._2)).flatten).toArray
-  }
-
-  def merge(m1: Map[Int, (Double, Int)], m2: Map[Int, (Double, Int)]): Map[Int, (Double, Int)] = {
-    m2 ++ m1.map {
-      case (k, v) => k -> (v._1 + m2.getOrElse(k, (0.0, 0))._1, v._2 + m2.getOrElse(k, (0.0, 0))._2)
-    }
-  }
-
 
 }
