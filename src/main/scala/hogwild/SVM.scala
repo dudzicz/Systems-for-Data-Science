@@ -31,8 +31,8 @@ object SVM {
     * @return the loss for the given data-point
     */
   def loss(x: Map[Int, Double], y: Int, w: Array[Double], lambda: Double): Double = {
-    val e = x.keys
-    val xe = x.values
+    val e = x.keys.toList
+    val xe = x.values.toList
     val we = select(e, w)
     val a = 1 - y * scalarProduct(we, xe)
     max(a, 0) + lambda * we.map(i => i * i).sum
@@ -76,8 +76,8 @@ object SVM {
     * @return the sparse gradient for the given data-point
     */
   def sparseGradient(x: Map[Int, Double], y: Int, w: Array[Double], lambda: Double): Map[Int, Double] = {
-    val e = x.keys
-    val xe = x.values
+    val e = x.keys.toList
+    val xe = x.values.toList
     val we = select(e, w)
     val g = gradient(xe, y, we, lambda)
     e.zip(g).toMap
@@ -124,8 +124,8 @@ object SVM {
     * @return the predicted label (1 or -1)
     */
   def predict(x: Map[Int, Double], w: Array[Double]): Int = {
-    val e = x.keys
-    val xe = x.values
+    val e = x.keys.toList
+    val xe = x.values.toList
     val we = select(e, w)
     if (scalarProduct(xe, we) >= 0) 1 else -1
   }

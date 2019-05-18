@@ -122,5 +122,4 @@ object Hogwild {
     val ends = starts.map(_ - 1).drop(1) :+ range.end
     starts.zip(ends).map { case (start, end) => Stream.continually(Stream.range(start, end)).flatten }.toArray
   }
-
 }
