@@ -91,13 +91,13 @@ object SVM {
   /**
     * Merges two sparse gradient together.
     *
-    * @param g1 the first sparse gradient
-    * @param g2 the second sparse gradient
+    * @param m1 the first sparse gradient
+    * @param m2 the second sparse gradient
     * @return the combined sparse gradient
     */
-  def mergeSparseGradient(g1: Map[Int, (Double, Int)], g2: Map[Int, (Double, Int)]): Map[Int, (Double, Int)] = {
-    g2 ++ g1.map {
-      case (e, (g, d)) => e -> (g + g2.getOrElse(e, (0.0, 0))._1, d + g2.getOrElse(e, (0.0, 0))._2)
+  def mergeSparseGradient(m1: Map[Int, (Double, Int)], m2: Map[Int, (Double, Int)]): Map[Int, (Double, Int)] = {
+    m2 ++ m1.map {
+      case (k, v) => k -> (v._1 + m2.getOrElse(k, (0.0, 0))._1, v._2 + m2.getOrElse(k, (0.0, 0))._2)
     }
   }
 

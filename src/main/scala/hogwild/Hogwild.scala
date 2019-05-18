@@ -31,7 +31,8 @@ object Hogwild {
 
     val (data, dimensions) = loadData(DATA_PATH)
     val validationSize = (data.length * VALIDATION_RATIO).toInt
-    val (validationSet, trainSet) = random.shuffle(data).toArray.splitAt(validationSize)
+    val shuffledData = random.shuffle(data).toArray
+    val (validationSet, trainSet) = shuffledData.splitAt(validationSize)
 
     val weights = Array.fill(dimensions)(0.0)
     val workerIndices = splitRange(trainSet.indices, workers)
@@ -69,15 +70,14 @@ object Hogwild {
     def runner(id: Int): Unit = {
       var indices = workerIndices(id)
       while (!done) {
-        val batch = indices.take(batchSize).map(trainSet(_))
+        val batch = indices.take(batchSize)
         indices = indices.drop(batchSize)
 
         if (locking) lock.acquire()
         val workerWeights = weights.clone()
         if (locking) lock.release()
 
-
-        val gradient = batch.map(sparseGradient(_, workerWeights, LAMBDA)).map(expandSparseGradient).reduce(mergeSparseGradient)
+        val gradient = batch.map(trainSet(_)).map(sparseGradient(_, workerWeights, LAMBDA)).map(expandSparseGradient).reduce(mergeSparseGradient)
 
         if (locking) lock.acquire()
         updateWeight(weights, gradient, LEARNING_RATE)

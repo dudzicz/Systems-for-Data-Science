@@ -22,8 +22,8 @@ object Data {
     * @return the data loaded as a sparse format, and the number of dimensions in the data
     */
   def loadDataRDD(sc: SparkContext, path: String): (RDD[(Int, (Map[Int, Double], Int))], Int) = {
-    val dataLines = sc.textFile("file://" + path + "lyrl2004_vectors_train.dat")
-    val topics = sc.textFile("file://" + path + "rcv1-v2.topics.qrels")
+    val dataLines = sc.textFile("file:///data/" + path + "lyrl2004_vectors_train.dat")
+    val topics = sc.textFile("file:///data/" + path + "rcv1-v2.topics.qrels")
     val labels = topics.map(parseTopics).groupByKey().mapValues(topicsToLabel(_, SELECT_LABEL))
     val data = dataLines.map(parseData)
     val dimensions = data.map { case (_, x) => x.keys.max }.reduce(max) + 1
@@ -97,11 +97,11 @@ object Data {
     */
   def testAccuracy(sc: SparkContext, path: String, weights: Array[Double]): (Double, Double, Double) = {
     val testIndex = 0 until 4
-    val topics = sc.textFile("file://" + path + "rcv1-v2.topics.qrels")
+    val topics = sc.textFile("file:///data/" + path + "rcv1-v2.topics.qrels")
     val labels = topics.map(parseTopics).groupBy(_._1).mapValues(cat => topicsToLabel(cat.map(_._2), SELECT_LABEL))
 
     val rdds = testIndex.map(i => {
-      val datalines = sc.textFile("file://" + path + "lyrl2004_vectors_test_pt" + i + ".dat")
+      val datalines = sc.textFile("file:///data/" + path + "lyrl2004_vectors_test_pt" + i + ".dat")
       val data = datalines.map(parseData)
       data.join(labels)
     })

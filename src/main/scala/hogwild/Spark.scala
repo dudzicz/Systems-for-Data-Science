@@ -28,7 +28,7 @@ object Spark {
 
     val workers = conf.getInt("spark.executor.instances", 1)
 
-    val logfileName = LOG_PATH + "/spark/" + workers + "_" + batch_size
+    val logfileName = "/data/" + LOG_PATH + "/spark/" + workers + "_" + batch_size
     val logfile = new FileWriter(logfileName, false)
     log(logfile, workers, batch_size)
 
@@ -54,7 +54,7 @@ object Spark {
 
         log(logfile, e, "GRADIENTS_COMPUTED")
 
-        val gradient = grads.par.map(expandSparseGradient).aggregate(Map[Int, (Double, Int)]())(mergeSparseGradient, mergeSparseGradient)
+        val gradient = grads.map(expandSparseGradient).par.aggregate(Map[Int, (Double, Int)]())(mergeSparseGradient, mergeSparseGradient)
 
         log(logfile, e, "GRADIENTS_MERGED")
 
