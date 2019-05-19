@@ -52,6 +52,7 @@ with `<workers>` and `<batch_size>` being the desired number of workers and batc
 The local version can be ran using the following command:
 
 ```
+make build
 sh run-local.sh <mode> <workers> <batch_size>
 ```
 
