@@ -57,3 +57,5 @@ sh run-local.sh <mode> <workers> <batch_size>
 ```
 
 with `<mode>` being the desired running mode (one of `hogwild` or `lock`), `<workers>` and `<batch_size>` being the desired number of workers and batch size respectively.
+
+__Note__: By default the program assumes that the dataset is placed in a `<current_directory>/datasets`. This can be modified in the `Parameters.scala` file
