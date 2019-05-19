@@ -1,9 +1,9 @@
-# Systems for Data Science (CS-449) - Project Milestone 1
+# Systems for Data Science (CS-449) - Project Milestone 2
 ## GROUP 1 - Vincent Coriou, Damian Dudzicz, Karthigan Sinnathamby
 
 ### Project Description
 
-This constitutes the code to run the implementation in Spark of the first milestone of the EPFL CS-449 course. The code is based on work of Bifano, Bachmann and Allemann [hogwild-python](https://github.com/liabifano/hogwild-python/) and the paper [HOGWILD!](https://arxiv.org/abs/1106.5730).
+This constitutes the code to run the our implementation of the EPFL CS-449 course's project. The code is based on work of Bifano, Bachmann and Allemann [hogwild-python](https://github.com/liabifano/hogwild-python/) and the paper [HOGWILD!](https://arxiv.org/abs/1106.5730).
 
 ### Setup Requirements
 
@@ -18,13 +18,19 @@ It is also required to define the environment variable ```$SPARK_HOME``` to the 
 
 ### Source Code Structure
 
-```src/main/scala``` contains the source code of the implementaiton
-* ```Data.scala``` contains the method to load and parse the Data
-* ```main.Main.scala``` contains the core of the run and the computations
-* ```Parameters.Scala``` holds constants and parameters
+```src/main/scala/hogwild``` contains the source code of the implementation
+* ```Data.scala``` contains the methods to load and parse the Data
+* ```Hogwild.scala``` contains the methods to run the local implementation of Hogwild (milestone 2)
+* ```Log.scala``` contains the methods used to log events throughout the execution of the training
+* ```Main.scala``` contains the main runnable method that interprets and parses the given program arguments
+* ```Parameters.Scala``` contains constants and parameters
 * ```SVM.scala``` contains the machine learning computations functions for the SVM
+* ```Spark.scala``` contains the methods to run the Spark implementation of Hogwild (milestone 1)
+
 
 ### How to Run the Project
+
+#### Spark version
 
 In order to create the pod used to upload data to the cluster use the following command:
 
@@ -35,13 +41,18 @@ kubectl create -f Kubernetes/data_pod.yaml
 In order to run the program on the cluster, use the following commands:
 
 ```
-make workers=<workers> batch_size=<batch_size>
+make
+sh run-cluster.sh <workers> <batch_size>
 ```
 
 with `<workers>` and `<batch_size>` being the desired number of workers and batch size respectively.
 
-In order to run the program with the same inputs we used for the report, use the following command:
+#### Local version
+
+The local version can be ran using the following command:
 
 ```
-sh run_all.sh
+sh run-local.sh <mode> <workers> <batch_size>
 ```
+
+with `<mode>` being the desired running mode (one of `hogwild` or `lock`), `<workers>` and `<batch_size>` being the desired number of workers and batch size respectively.
